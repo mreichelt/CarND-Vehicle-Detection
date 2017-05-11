@@ -1,0 +1,36 @@
+Parameters used to extract features and train the LinearSVC classifier:
+        load_extracted_features=False,  # load features from file (faster development of classifier)
+        save_extracted_features=True,  # save extracted features to file
+        sample_size=None,  # max number of samples to use
+        random_state=None,  # for splitting dataset into train/test sets, set to fixed number for non-random
+        test_size=0.2,  # fraction of test set
+        color_space='YUV',  # color space to use
+
+        add_spatial_features=True,  # True to include spatial features (resized image)
+        spatial_size=(32, 32),
+
+        add_histogram_features=True,  # True to include color histogram
+        histogram_bins=32,
+
+        add_hog_features=True,  # True to include HOG (histogram of gradients) features
+        hog_orientations=9,
+        hog_pixels_per_cell=8,
+        hog_cells_per_block=2,
+        hog_channel='ALL'
+
+LinearSVC(C=0.001)
+
+
+Output:
+8792 images of vehicles
+8968 images of non-vehicles
+Extracting features…
+took 103015 ms
+vehicle shape:     (8792, 8460)
+non-vehicle shape: (8968, 8460)
+saving features to file
+Training an SVM…
+
+Training SVC took 5.42 seconds
+Test Accuracy of SVC = 0.9963
+saving features to file
