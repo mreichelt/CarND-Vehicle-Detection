@@ -161,7 +161,22 @@ Here is an image of what the feature vector looks before & after scaling:
 
 ![dataset sample](output_images/002_scaling.jpg)
 
-First I tried training a `svm.LinearSVC`. 
+First I tried training a `svm.LinearSVC`. Then I shortly tried to implement a neural network with Keras & TensorFlow.
+
+Finally, I tried to fit different SVMs to the data by using `GridSearchCV` like this:
+```python
+parameters = {'kernel': ('linear', 'rbf'), 'C': [0.001, 0.1, 1, 10]}
+svr = svm.SVC()
+clf = GridSearchCV(svr, parameters)
+clf.fit(X_train, y_train)
+print('Best parameters found: {}'.format(clf.best_params_))
+```
+
+The best parameters were a LinearSVC with `C=0.001`, so I chose that one to train on a 80/20 train/test split. I achieved
+an overall test set accuracy of 99.5%.
+
+To move forward, I stored the classifier and the standard scaler in a file `classifier.p` with pickle.
+
 
 ### Sliding Window Search
 
