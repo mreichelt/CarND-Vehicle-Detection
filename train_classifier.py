@@ -156,8 +156,8 @@ def load_features(file='extracted_features.p'):
     """Load extracted features from file, returns [X, y, X_scaled, X_scaler]"""
     print('loading features from file')
     p = pickle_load_big(file)
-    X_scaler = StandardScaler().set_params(p['X_scaler_params'])
-    return p['X'], p['y'], p['X_scaled'], X_scaler
+    # X_scaler = StandardScaler().set_params(p['X_scaler_params'])
+    return p['X'], p['y'], p['X_scaled'], None
 
 
 def save_classifier(clf: LinearSVC, X_scaler: StandardScaler, file='classifier.p'):
@@ -171,8 +171,8 @@ def save_classifier(clf: LinearSVC, X_scaler: StandardScaler, file='classifier.p
 
 
 def main(
-        load_extracted_features=False,  # load features from file (faster development of classifier)
-        save_extracted_features=True,  # save extracted features to file
+        load_extracted_features=True,  # load features from file (faster development of classifier)
+        save_extracted_features=False,  # save extracted features to file
         sample_size=None,  # max number of samples to use
         random_state=None,  # for splitting dataset into train/test sets, set to fixed number for non-random
         test_size=0.2,  # fraction of test set
@@ -201,11 +201,6 @@ def main(
         if sample_size is not None:
             vehicles = vehicles[0:sample_size]
             non_vehicles = non_vehicles[0:sample_size]
-
-        # plot some images
-        # image = read_rgb_image(vehicles[100])
-        # plt.imshow(image)
-        # plt.show()
 
         # extract features for vehicles and non vehicles
         print('Extracting features…')
@@ -246,6 +241,24 @@ def main(
 
     else:
         X, y, X_scaled, X_scaler = load_features()
+
+    vehicles = glob.glob('dataset/vehicles/**/*.png', recursive=True)
+    car_ind = np.random.randint(0, len(vehicles))
+    # Plot an example of raw and scaled features
+    fig = plt.figure(figsize=(12, 4))
+    plt.subplot(131)
+    plt.imshow(mpimg.imread(vehicles[car_ind]))
+    plt.title('Original Image')
+    plt.subplot(132)
+    plt.plot(X[car_ind])
+    plt.title('Raw Features')
+    plt.subplot(133)
+    plt.plot(X_scaled[car_ind])
+    plt.title('Normalized Features')
+    fig.tight_layout()
+    plt.show()
+
+    exit()
 
     # split into training and test sets
     X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=test_size, random_state=random_state)
