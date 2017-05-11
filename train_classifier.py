@@ -202,19 +202,10 @@ def main(
             vehicles = vehicles[0:sample_size]
             non_vehicles = non_vehicles[0:sample_size]
 
-        fig = plt.figure()
-        a = fig.add_subplot(1, 2, 1)
-        plt.imshow(read_rgb_image(vehicles[100]))
-        a.set_title('Vehicle')
-        a = fig.add_subplot(1, 2, 2)
-        imgplot = plt.imshow(read_rgb_image(non_vehicles[100]))
-        imgplot.set_clim(0.0, 0.7)
-        a.set_title('No Vehicle')
-        plt.savefig('output_images/001_dataset.jpg')
-        plt.show()
-
-        # TODO
-        exit()
+        # plot some images
+        # image = read_rgb_image(vehicles[100])
+        # plt.imshow(image)
+        # plt.show()
 
         # extract features for vehicles and non vehicles
         print('Extracting features…')
