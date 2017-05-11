@@ -56,7 +56,7 @@ def slide_window(img,
     return window_list
 
 
-def sliding_windows_for_vehicles(img, xy_overlap=(0.5, 0.5), y_min = 320):
+def sliding_windows_for_vehicles(img, xy_overlap=(0.5, 0.5), y_min=320):
     window_definitions = [
         # window size, y_start, y_end
         [200, y_min, None],
@@ -74,26 +74,59 @@ def sliding_windows_for_vehicles(img, xy_overlap=(0.5, 0.5), y_min = 320):
     return windows
 
 
+def part(image, bbox):
+    """Returns a part of an image (defined by a bounding box)"""
+    start, end = bbox
+    return image[start[1]:end[1], start[0]:end[0]]
+
+
+def feature_vector(image, window, size=(64, 64)):
+    image = part(image, window)
+    image = cv2.resize(image, size)
+    return train_classifier.extract_features(
+        [image],
+        color_space='YUV',
+        add_spatial_features=True,
+        spatial_size=(32, 32),
+        add_histogram_features=True,
+        histogram_bins=32,
+        add_hog_features=True,
+        hog_orientations=9,
+        hog_pixels_per_cell=8,
+        hog_cells_per_block=2,
+        hog_channel='ALL'
+    )[0]
+
+
 # Define a function to draw bounding boxes
 def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
     """Draw bounding boxes"""
     result = np.copy(img)
     for bbox in bboxes:
-        cv2.rectangle(result, bbox[0], bbox[1], color, thick)
+        cv2.rectangle(result, (bbox[0][0], bbox[0][1]),  (bbox[1][0], bbox[1][1]), color, thick)
     return result
 
 
 def main():
     # load image, get sliding windows
     image = train_classifier.read_rgb_image('bbox-example-image.jpg')
-    bboxes = sliding_windows_for_vehicles(image)
-    image = draw_boxes(image, bboxes)
-    plt.imshow(image)
-    plt.show()
+    bboxes = np.array(sliding_windows_for_vehicles(image))
 
-
-
+    # get feature vectors for bboxes
     clf, X_scaler = train_classifier.load_classifier()
+    feature_vectors = np.array([feature_vector(image, bbox) for bbox in bboxes])
+    print(feature_vectors.shape)
+
+    # scale like training data
+    scaled_feature_vectors = X_scaler.transform(feature_vectors)
+
+    # now make predictions
+    predictions = clf.predict(scaled_feature_vectors)
+    bboxes = bboxes[predictions == 1]
+    output = draw_boxes(image, bboxes)
+    plt.imshow(output)
+    plt.savefig('output_images/005_first_prediction.jpg')
+    plt.show()
 
 
 main()

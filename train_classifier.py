@@ -84,9 +84,11 @@ def extract_features(images,
 
     features = []
 
-    for file in images:
+    for image in images:
         file_features = []
-        image = read_rgb_image(file)
+        if type(image) is str:
+            image = read_rgb_image(image)
+
         image = convert_color(image, color_space=color_space)
 
         if add_spatial_features:
@@ -168,7 +170,7 @@ def save_classifier(clf: LinearSVC, X_scaler: StandardScaler, file='classifier.p
     pickle.dump(p, open(file, mode='wb'))
 
 
-def load_classifier(file='classifier.p'):
+def load_classifier(file='classifier.p') -> (LinearSVC, StandardScaler):
     """Load LinearSVC classifier and X_scaler from file"""
     print('loading classifier from file')
     p = pickle.load(open(file, mode='rb'))
@@ -261,7 +263,6 @@ def main(
     print('Test Accuracy of SVC = {:.4f}'.format(clf.score(X_test, y_test)))
 
     save_classifier(clf, X_scaler)
-
 
 # deactivated to prevent call when imported in vehicle_detection.py
 # main()
