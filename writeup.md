@@ -29,26 +29,139 @@ The goals / steps of this project are the following:
 
 #### 1. Explain how (and identify where in your code) you extracted HOG features from the training images.
 
-The code for this step is contained in the first code cell of the IPython notebook (or in lines # through # of the file called `some_file.py`).  
+The code for feature extraction and SVM training is contained in [train_classifier.py](train_classifier.py).
 
-I started by reading in all the `vehicle` and `non-vehicle` images.  Here is an example of one of each of the `vehicle` and `non-vehicle` classes:
+I started by reading all 8792 vehicle images and 8968 non-vehicle images, Example:
 
-![alt text][image1]
+![dataset sample](output_images/001_dataset.jpg)
 
-I then explored different color spaces and different `skimage.hog()` parameters (`orientations`, `pixels_per_cell`, and `cells_per_block`).  I grabbed random images from each of the two classes and displayed them to get a feel for what the `skimage.hog()` output looks like.
+To prevent the different scale from how matplotlib loads JPG images and PNG images I defined a method that loads them
+and automatically scales (0..1) floating point values to (0..255) integers:
 
-Here is an example using the `YCrCb` color space and HOG parameters of `orientations=8`, `pixels_per_cell=(8, 8)` and `cells_per_block=(2, 2)`:
+```python
+def read_rgb_image(file):
+    """Read RGB image on (0, 256) color scale and uint8 type"""
+    image = mpimg.imread(file)
+    if np.max(image) <= 1:
+        image *= 255
+    return np.uint8(image)
+```
+
+Also, I defined a function to extract features from the images similar to the Udacity lesson:
+
+```python
+def extract_features(images,
+                     color_space='RGB',
+
+                     add_spatial_features=True,
+                     spatial_size=(32, 32),
+
+                     add_histogram_features=True,
+                     histogram_bins=32,
+
+                     add_hog_features=True,
+                     hog_orientations=9,
+                     hog_pixels_per_cell=8,
+                     hog_cells_per_block=2,
+                     hog_channel=0
+                     ):
+    """Extract features from a list of images"""
+
+    features = []
+
+    for file in images:
+        file_features = []
+        image = read_rgb_image(file)
+        image = convert_color(image, color_space=color_space)
+
+        if add_spatial_features:
+            file_features.append(bin_spatial(image, size=spatial_size))
+
+        if add_histogram_features:
+            file_features.append(color_hist(image, bins=histogram_bins))
+
+        if add_hog_features:
+            if hog_channel == 'ALL':
+                hog_features = []
+                for channel in range(image.shape[2]):
+                    hog_features.append(get_hog_features(image[:, :, channel],
+                                                         hog_orientations,
+                                                         hog_pixels_per_cell,
+                                                         hog_cells_per_block,
+                                                         visualize=False,
+                                                         feature_vector=True))
+                hog_features = np.ravel(hog_features)
+            else:
+                hog_features = get_hog_features(image[:, :, hog_channel],
+                                                hog_orientations,
+                                                hog_pixels_per_cell,
+                                                hog_cells_per_block,
+                                                visualize=False,
+                                                feature_vector=True)
+            file_features.append(hog_features)
+
+        features.append(np.concatenate(file_features))
+
+    return np.array(features)
+```
+
+This function can be configured by varying the parameters. By default, it extracts 3 types of features from a list of
+images (after applying a color transform):
+
+1. **Spatial**: the image itself in a scaled form
+2. **Color Histogram**: The histogram of all color values in an image
+3. **HOG**: The histogram of gradients of an image.
 
 
-![alt text][image2]
+#### 2. Explain how you settled on your final choice of color features & HOG parameters.
 
-#### 2. Explain how you settled on your final choice of HOG parameters.
+By using a small `sample_size` and manually selecting only one of the types of features (either spatial, color histogram
+or HOG) I tried to vary the parameters. Instead of trusting my human eye to choose which parameters would work better,
+I always trained a small `LinearSVC` classifier to see which changes would improve the actual accuracy on the test set.
+For that, I chose a train/test split of 80% and 20%.
 
-I tried various combinations of parameters and...
+##### Color Space
+For choosing the color space I left all 3 features on - because the color space affects all of them.
+After trying out a few, the color space `YUV` improved the test set accuracy best.
 
-#### 3. Describe how (and identify where in your code) you trained a classifier using your selected HOG features (and color features if you used them).
+##### Spatial
 
-I trained a linear SVM using...
+For the `spatial_size` I tried `(16, 16)` as well as `(64, 64)`. The test accuracy decreased for both of them, so I
+sticked with the original value of `(32, 32)`.
+
+##### Color histogram
+
+For me, the original value of `histogram_bins = 32` improved the test set accuracy most.
+
+##### HOG
+
+While the variation of `hog_pixels_per_cell = 8` and `hog_cells_per_block = 2` did not improve the classifier, an increase
+of `hog_orientations` to `18` or `32` positively affected test accuracy - but negatively impacted the performance.
+
+Also, when I tried out `hog_orientations = 32` on the complete data set this lead to a decreased test set accuracy.
+This might have been a result of overfitting the training data. Because of this I reverted my changes and used
+`hog_orientations = 9`.
+
+Finally, I altered the `hog_channel` parameter. With the chosen color space `YUV` the test accuracy actually improved when
+I used all 3 channels, so I used `hog_channel = 'ALL'`.
+
+
+#### 3. Describe how you trained a classifier using your selected HOG features.
+
+Before I could use the feature vectors from before, I had to scale & normalize the data:
+
+```python
+# normalizing / scaling features
+X = np.vstack((vehicles_features, non_vehicles_features)).astype(np.float64)
+X_scaler = StandardScaler().fit(X)
+X_scaled = X_scaler.transform(X)
+```
+
+Here is an image of what the feature vector looks before & after scaling:
+
+![dataset sample](output_images/002_scaling.jpg)
+
+First I tried training a `svm.LinearSVC`. 
 
 ### Sliding Window Search
 
