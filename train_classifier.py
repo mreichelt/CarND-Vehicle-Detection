@@ -164,8 +164,15 @@ def save_classifier(clf: LinearSVC, X_scaler: StandardScaler, file='classifier.p
         'clf': clf,
         'X_scaler': X_scaler
     }
-    print('saving features to file')
+    print('saving classifier to file')
     pickle.dump(p, open(file, mode='wb'))
+
+
+def load_classifier(file='classifier.p'):
+    """Load LinearSVC classifier and X_scaler from file"""
+    print('loading classifier from file')
+    p = pickle.load(open(file, mode='rb'))
+    return p['clf'], p['X_scaler']
 
 
 def main(
@@ -256,4 +263,5 @@ def main(
     save_classifier(clf, X_scaler)
 
 
-main()
+# deactivated to prevent call when imported in vehicle_detection.py
+# main()
