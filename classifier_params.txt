@@ -1,10 +1,11 @@
 Parameters used to extract features and train the LinearSVC classifier:
-        load_extracted_features=False,  # load features from file (faster development of classifier)
-        save_extracted_features=True,  # save extracted features to file
+        load_extracted_features=True,  # load features from file (faster development of classifier)
+        save_extracted_features=False,  # save extracted features to file
         sample_size=None,  # max number of samples to use
-        random_state=None,  # for splitting dataset into train/test sets, set to fixed number for non-random
+        random_state=1,  # for splitting dataset into train/test sets, set to fixed number for non-random
         test_size=0.2,  # fraction of test set
         color_space='YUV',  # color space to use
+        linearsvc_c=0.001,  # C parameter of LinearSVC
 
         add_spatial_features=True,  # True to include spatial features (resized image)
         spatial_size=(32, 32),
@@ -31,6 +32,6 @@ non-vehicle shape: (8968, 8460)
 saving features to file
 Training an SVM…
 
-Training SVC took 5.42 seconds
-Test Accuracy of SVC = 0.9963
+Training SVC took 5.81 seconds
+Test Accuracy of SVC = 0.9947
 saving features to file

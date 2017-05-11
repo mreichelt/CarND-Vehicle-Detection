@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from skimage.feature import hog
 from sklearn.svm import LinearSVC
-from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
@@ -146,7 +145,7 @@ def save_features(X, y, X_scaled, X_scaler: StandardScaler, file='extracted_feat
         'X': X,
         'y': y,
         'X_scaled': X_scaled,
-        'X_scaler_params': X_scaler.get_params()
+        'X_scaler': X_scaler
     }
     print('saving features to file')
     pickle_save_big(p, file)
@@ -156,15 +155,14 @@ def load_features(file='extracted_features.p'):
     """Load extracted features from file, returns [X, y, X_scaled, X_scaler]"""
     print('loading features from file')
     p = pickle_load_big(file)
-    X_scaler = StandardScaler().set_params(p['X_scaler_params'])
-    return p['X'], p['y'], p['X_scaled'], X_scaler
+    return p['X'], p['y'], p['X_scaled'], p['X_scaler']
 
 
 def save_classifier(clf: LinearSVC, X_scaler: StandardScaler, file='classifier.p'):
     """Save classifier and X_scaler to file"""
     p = {
-        'clf_params': clf.get_params(),
-        'X_scaler_params': X_scaler.get_params()
+        'clf': clf,
+        'X_scaler': X_scaler
     }
     print('saving features to file')
     pickle.dump(p, open(file, mode='wb'))
@@ -174,9 +172,10 @@ def main(
         load_extracted_features=False,  # load features from file (faster development of classifier)
         save_extracted_features=True,  # save extracted features to file
         sample_size=None,  # max number of samples to use
-        random_state=None,  # for splitting dataset into train/test sets, set to fixed number for non-random
+        random_state=1,  # for splitting dataset into train/test sets, set to fixed number for non-random
         test_size=0.2,  # fraction of test set
         color_space='YUV',  # color space to use
+        linearsvc_c=0.001,  # C parameter of LinearSVC
 
         add_spatial_features=True,  # True to include spatial features (resized image)
         spatial_size=(32, 32),
@@ -201,11 +200,6 @@ def main(
         if sample_size is not None:
             vehicles = vehicles[0:sample_size]
             non_vehicles = non_vehicles[0:sample_size]
-
-        # plot some images
-        # image = read_rgb_image(vehicles[100])
-        # plt.imshow(image)
-        # plt.show()
 
         # extract features for vehicles and non vehicles
         print('Extracting features…')
@@ -253,7 +247,7 @@ def main(
     # train a classifier
     print('Training an SVM…')
     t = time.time()
-    clf = LinearSVC(C=0.001)
+    clf = LinearSVC(C=linearsvc_c)
     clf.fit(X_train, y_train)
 
     print('\nTraining SVC took {:.2f} seconds'.format(time.time() - t))
