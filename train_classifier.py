@@ -86,7 +86,7 @@ def extract_features(images,
 
     for image in images:
         file_features = []
-        if type(image) is str:
+        if image.type is str:
             image = read_rgb_image(image)
 
         image = convert_color(image, color_space=color_space)

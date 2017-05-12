@@ -80,54 +80,111 @@ def part(image, bbox):
     return image[start[1]:end[1], start[0]:end[0]]
 
 
-def scale_window(window, scale):
-    return scale_tuple(window[0], scale), scale_tuple(window[1], scale)
+def scale_windows(windows, scale):
+    return [(scale_tuple(window[0], scale), scale_tuple(window[1], scale)) for window in windows]
 
 
 def scale_tuple(point, scale):
-    point = scale * point
-    return int(point[0]), int(point[1])
+    return int(point[0] * scale), int(point[1] * scale)
 
 
-def feature_vector(image, window,
-                   size=64,
-                   conversion=cv2.COLOR_RGB2YUV,
-                   hog_orientations=9,
-                   hog_pixels_per_cell=8,
-                   hog_cells_per_block=2,
-                   hog_channel=0
-                   ):
+def feature_vectors(image,
+                    y_min=320,
+                    conversion=cv2.COLOR_RGB2YUV,
+
+                    add_spatial_features=True,  # True to include spatial features (resized image)
+                    spatial_size=(32, 32),
+
+                    add_histogram_features=True,  # True to include color histogram
+                    histogram_bins=32,
+
+                    add_hog_features=True,  # True to include HOG (histogram of gradients) features
+                    hog_orientations=9,
+                    hog_pixels_per_cell=8,
+                    hog_cells_per_block=2,
+                    hog_channels=[0, 1, 2],
+                    xy_overlap=(0.5, 0.5),  # how much to overlap sliding windows
+                    train_size=64  # image size used to create the original feature vectors (64x64)
+                    ):
+    vectors = []
+    all_windows = []
+
+    # color conversion only needed once
     image = cv2.cvtColor(image, conversion)
-    height, width = image.shape[:2]
-    scale = 64 / 128
-    image = cv2.resize(image, (int(scale * width), int(scale * height)))
-    window = scale_window(window, scale)
-    image = part(image, window)
 
+    window_definitions = [
+        # window size, y_start, y_end
+        # [200, y_min, None],
+        [128, y_min, None],
+        # [96, y_min, None],
+        [64, y_min, None]
+    ]
 
-    # vec, vis = train_classifier.get_hog_features(image[:, :, hog_channel],
-    #                                              orientations=hog_orientations,
-    #                                              pix_per_cell=hog_pixels_per_cell,
-    #                                              cell_per_block=hog_cells_per_block,
-    #                                              visualize=True,
-    #                                              feature_vector=False)
-    # plt.imshow(vis)
-    # plt.show()
-    # exit()
+    # run multiple windows of each definition once - allows us to reuse images for multiple windows
+    for window_definition in window_definitions:
+        window_size, y_start, y_stop = window_definition
+        y_start_stop = (y_start, y_stop)
 
-    return train_classifier.extract_features(
-        [image],
-        color_space='YUV',
-        add_spatial_features=True,
-        spatial_size=(32, 32),
-        add_histogram_features=True,
-        histogram_bins=32,
-        add_hog_features=True,
-        hog_orientations=9,
-        hog_pixels_per_cell=8,
-        hog_cells_per_block=2,
-        hog_channel='ALL'
-    )[0]
+        # define all windows in one size
+        windows = slide_window(image, xy_window=(window_size, window_size), y_start_stop=y_start_stop,
+                               xy_overlap=xy_overlap)
+        all_windows.extend(windows)
+
+        # rescale the image and windows
+        scale = train_size / window_size
+        height, width = image.shape[:2]
+        scaled_image = cv2.resize(image, (int(scale * width), int(scale * height)))
+        scaled_windows = scale_windows(windows, scale)
+
+        # precompute whole HOG once for one scale
+        if add_hog_features:
+            hog_precomputed = np.array([
+                                        train_classifier.get_hog_features(scaled_image[:, :, hog_channel],
+                                                                          orientations=hog_orientations,
+                                                                          pix_per_cell=hog_pixels_per_cell,
+                                                                          cell_per_block=hog_cells_per_block,
+                                                                          feature_vector=False
+                                                                          ) for hog_channel in hog_channels
+                                        ])
+            hog_shape = (
+                hog_pixels_per_cell - 1, hog_pixels_per_cell - 1,
+                hog_cells_per_block, hog_cells_per_block,
+                hog_orientations)
+
+        # now we have the same size as in training mode, so let's create the feature vector(s)
+        # for each window create a single vector
+        for scaled_window in scaled_windows:
+            window_features = []
+
+            # get only part of image that interests us
+            p = part(scaled_image, scaled_window)
+
+            if add_spatial_features:
+                window_features.append(train_classifier.bin_spatial(p, size=spatial_size))
+
+            if add_histogram_features:
+                window_features.append(train_classifier.color_hist(p, bins=histogram_bins))
+
+            if add_hog_features:
+                hog_features = []
+                for hog_one_channel in hog_precomputed:
+                    # extract HOG features of the scaled window
+                    start = scaled_window[0]
+                    hog_start_x = int(start[0] / hog_pixels_per_cell)
+                    hog_start_y = int(start[1] / hog_pixels_per_cell)
+                    hog_end_x = hog_start_x + hog_shape[1]
+                    hog_end_y = hog_start_y + hog_shape[0]
+                    window_hog = hog_one_channel[hog_start_y:hog_end_y, hog_start_x:hog_end_x]
+                    if window_hog.shape != hog_shape:
+                        exit('HOG shapes not equal: {} vs {}'.format(window_hog.shape, hog_shape))
+                    hog_features.extend(window_hog.ravel())
+                window_features.append(hog_features)
+
+            vector = np.concatenate(window_features)
+            print(vector.shape)
+            vectors.append(vector)
+
+    return np.array(vectors), np.array(all_windows)
 
 
 # Define a function to draw bounding boxes
@@ -140,17 +197,19 @@ def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
 
 
 def main():
-    # load image, get sliding windows
+    # load image & classifier
     image = train_classifier.read_rgb_image('bbox-example-image.jpg')
-    bboxes = np.array(sliding_windows_for_vehicles(image))
-
-    # get feature vectors for bboxes
     clf, X_scaler = train_classifier.load_classifier()
-    feature_vectors = np.array([feature_vector(image, bbox) for bbox in bboxes])
-    print(feature_vectors.shape)
+
+    # get feature vectors and according bboxes
+    print('extracting features')
+    t = time.time()
+    vecs, bboxes = feature_vectors(image)
+    print(vecs.shape)
+    print('took {:.0f} ms'.format((time.time() - t) * 1000))
 
     # scale like training data
-    scaled_feature_vectors = X_scaler.transform(feature_vectors)
+    scaled_feature_vectors = X_scaler.transform(vecs)
 
     # now make predictions
     predictions = clf.predict(scaled_feature_vectors)
