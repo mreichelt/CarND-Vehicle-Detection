@@ -114,10 +114,10 @@ def feature_vectors(image,
 
     window_definitions = [
         # window size, y_start, y_end
-        # [200, y_min, None],
+        [192, y_min, None],
         [128, y_min, None],
         # [96, y_min, None],
-        [64, y_min, None]
+        # [64, y_min, None]
     ]
 
     # run multiple windows of each definition once - allows us to reuse images for multiple windows
