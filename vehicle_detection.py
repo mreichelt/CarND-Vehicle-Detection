@@ -1,6 +1,8 @@
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import LinearSVC
 
+from scipy.ndimage.measurements import label
+
 import train_classifier
 import time
 import cv2
@@ -193,9 +195,25 @@ def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
     return result
 
 
+def draw_labeled_bboxes(image, labels):
+    # Iterate through all detected cars
+    for car_number in range(1, labels[1] + 1):
+        # Find pixels with each car_number label value
+        nonzero = (labels[0] == car_number).nonzero()
+        nonzeroy = np.array(nonzero[0])
+        nonzerox = np.array(nonzero[1])
+        bbox = ((np.min(nonzerox), np.min(nonzeroy)), (np.max(nonzerox), np.max(nonzeroy)))
+        cv2.rectangle(image, bbox[0], bbox[1], (0, 0, 255), 6)
+    return image
+
+
 class HeatMapHistory:
-    def __init__(self, n=10):
+    def __init__(self,
+                 n=10,  # maximum number of heatmaps to store
+                 threshold=6  # threshold of how many heat is needed for a vehicle to be detected (summed up on frames)
+                 ):
         self.n = n
+        self.threshold = threshold
         self.heatmaps = []
 
     def append(self, heatmap):
@@ -203,9 +221,17 @@ class HeatMapHistory:
         # only store n heatmaps at maximum
         self.heatmaps = self.heatmaps[-self.n:]
 
-    def get_heatmap_sum(self):
-        # TODO
-        return np.sum(self.heatmaps)
+    def get_thresholded_heatmap(self):
+        heatmap = np.sum(self.heatmaps, axis=0)
+        heatmap[heatmap < self.threshold] = 0
+        return heatmap
+
+
+def get_heatmap(image, bboxes):
+    heatmap = np.zeros_like(image)
+    for box in bboxes:
+        heatmap[box[0][1]:box[1][1], box[0][0]:box[1][0]] += 1
+    return heatmap
 
 
 def pipeline(image, history: HeatMapHistory, clf: LinearSVC, scaler: StandardScaler):
@@ -221,8 +247,16 @@ def pipeline(image, history: HeatMapHistory, clf: LinearSVC, scaler: StandardSca
     predictions = clf.predict(feature_vectors)
     bboxes = bboxes[predictions == 1]
 
+    # generate heatmap from bboxes
+    heatmap = get_heatmap(image, bboxes)
+    history.append(heatmap)
+
+    # get thresholded heatmap from history (includes heatmaps from last frames)
+    thresholded_heatmap = history.get_thresholded_heatmap()
+    labels = label(heatmap)
+
     # draw output image
-    output = draw_boxes(image, bboxes)
+    output = draw_labeled_bboxes(image, labels)
     print('frame took {:.0f} ms'.format((time.time() - t) * 1000))
 
     return output
