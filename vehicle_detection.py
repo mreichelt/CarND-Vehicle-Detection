@@ -139,13 +139,13 @@ def feature_vectors(image,
         # precompute whole HOG once for one scale
         if add_hog_features:
             hog_precomputed = np.array([
-                                        train_classifier.get_hog_features(scaled_image[:, :, hog_channel],
-                                                                          orientations=hog_orientations,
-                                                                          pix_per_cell=hog_pixels_per_cell,
-                                                                          cell_per_block=hog_cells_per_block,
-                                                                          feature_vector=False
-                                                                          ) for hog_channel in hog_channels
-                                        ])
+                                           train_classifier.get_hog_features(scaled_image[:, :, hog_channel],
+                                                                             orientations=hog_orientations,
+                                                                             pix_per_cell=hog_pixels_per_cell,
+                                                                             cell_per_block=hog_cells_per_block,
+                                                                             feature_vector=False
+                                                                             ) for hog_channel in hog_channels
+                                           ])
             hog_shape = (
                 hog_pixels_per_cell - 1, hog_pixels_per_cell - 1,
                 hog_cells_per_block, hog_cells_per_block,
@@ -180,9 +180,7 @@ def feature_vectors(image,
                     hog_features.extend(window_hog.ravel())
                 window_features.append(hog_features)
 
-            vector = np.concatenate(window_features)
-            print(vector.shape)
-            vectors.append(vector)
+            vectors.append(np.concatenate(window_features))
 
     return np.array(vectors), np.array(all_windows)
 
