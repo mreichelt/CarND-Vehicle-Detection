@@ -1,13 +1,12 @@
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import LinearSVC
+
+import train_classifier
 import time
-import pickle
 import cv2
-import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy as np
-from skimage.feature import hog
-from sklearn.svm import LinearSVC
-from sklearn.preprocessing import StandardScaler
-import train_classifier
+from moviepy.editor import VideoFileClip
 
 
 def slide_window(img,
@@ -88,24 +87,24 @@ def scale_tuple(point, scale):
     return int(point[0] * scale), int(point[1] * scale)
 
 
-def feature_vectors(image,
-                    y_min=320,
-                    conversion=cv2.COLOR_RGB2YUV,
+def get_feature_vectors(image,
+                        y_min=320,
+                        conversion=cv2.COLOR_RGB2YUV,
 
-                    add_spatial_features=True,  # True to include spatial features (resized image)
-                    spatial_size=(32, 32),
+                        add_spatial_features=True,  # True to include spatial features (resized image)
+                        spatial_size=(32, 32),
 
-                    add_histogram_features=True,  # True to include color histogram
-                    histogram_bins=32,
+                        add_histogram_features=True,  # True to include color histogram
+                        histogram_bins=32,
 
-                    add_hog_features=True,  # True to include HOG (histogram of gradients) features
-                    hog_orientations=9,
-                    hog_pixels_per_cell=8,
-                    hog_cells_per_block=2,
-                    hog_channels=[0, 1, 2],
-                    xy_overlap=(0.5, 0.5),  # how much to overlap sliding windows
-                    train_size=64  # image size used to create the original feature vectors (64x64)
-                    ):
+                        add_hog_features=True,  # True to include HOG (histogram of gradients) features
+                        hog_orientations=9,
+                        hog_pixels_per_cell=8,
+                        hog_cells_per_block=2,
+                        hog_channels=[0, 1, 2],
+                        xy_overlap=(0.5, 0.5),  # how much to overlap sliding windows
+                        train_size=64  # image size used to create the original feature vectors (64x64)
+                        ):
     vectors = []
     all_windows = []
 
@@ -194,20 +193,57 @@ def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
     return result
 
 
-def main():
+class HeatMapHistory:
+    def __init__(self, n=10):
+        self.n = n
+        self.heatmaps = []
+
+    def append(self, heatmap):
+        self.heatmaps.append(heatmap)
+        # only store n heatmaps at maximum
+        self.heatmaps = self.heatmaps[-self.n:]
+
+    def get_heatmap_sum(self):
+        # TODO
+        return np.sum(self.heatmaps)
+
+
+def pipeline(image, history: HeatMapHistory, clf: LinearSVC, scaler: StandardScaler):
+    t = time.time()
+
+    # get those feature vectors, includes sliding window for performance reasons
+    feature_vectors, bboxes = get_feature_vectors(image)
+
+    # scale like training data
+    feature_vectors = scaler.transform(feature_vectors)
+
+    # predict!
+    predictions = clf.predict(feature_vectors)
+    bboxes = bboxes[predictions == 1]
+
+    # draw output image
+    output = draw_boxes(image, bboxes)
+    print('frame took {:.0f} ms'.format((time.time() - t) * 1000))
+
+    return output
+
+
+def main_test_image():
+    # load SVM classifier & scaler from file
+    clf, X_scaler = train_classifier.load_classifier()
+
     # load image & classifier
     image = train_classifier.read_rgb_image('bbox-example-image.jpg')
-    clf, X_scaler = train_classifier.load_classifier()
 
     # get feature vectors and according bboxes
     print('extracting features')
     t = time.time()
-    vecs, bboxes = feature_vectors(image)
-    print(vecs.shape)
+    feature_vectors, bboxes = get_feature_vectors(image)
+    print(feature_vectors.shape)
     print('took {:.0f} ms'.format((time.time() - t) * 1000))
 
     # scale like training data
-    scaled_feature_vectors = X_scaler.transform(vecs)
+    scaled_feature_vectors = X_scaler.transform(feature_vectors)
 
     # now make predictions
     predictions = clf.predict(scaled_feature_vectors)
@@ -217,4 +253,23 @@ def main():
     plt.show()
 
 
-main()
+def main(video_file, duration=None, end=False):
+    """Runs pipeline on a video and writes it to temp folder"""
+    print('processing video file {}'.format(video_file))
+    clip = VideoFileClip(video_file)
+
+    if duration is not None:
+        if end:
+            clip = clip.subclip(clip.duration - duration)
+        else:
+            clip = clip.subclip(0, duration)
+
+    # load SVM classifier & scaler from file
+    clf, scaler = train_classifier.load_classifier()
+    history = HeatMapHistory()
+    processed = clip.fl(lambda gf, t: pipeline(gf(t), history, clf, scaler), [])
+    processed.write_videofile('output.mp4', audio=False)
+
+
+# main_test_image()
+main('project_video.mp4', duration=10, end=True)
