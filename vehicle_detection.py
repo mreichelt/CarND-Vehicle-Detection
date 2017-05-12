@@ -56,25 +56,6 @@ def slide_window(img,
     return window_list
 
 
-def sliding_windows_for_vehicles(img, xy_overlap=(0.5, 0.5), y_min=320):
-    # TODO
-    window_definitions = [
-        # window size, y_start, y_end
-        # [200, y_min, None],
-        [128, y_min, None],
-        # [96, y_min, None],
-        # [64, y_min, None]
-    ]
-
-    windows = []
-    for definition in window_definitions:
-        size = definition[0]
-        y_start_stop = (definition[1], definition[2])
-        windows.extend(slide_window(img, xy_window=(size, size), y_start_stop=y_start_stop, xy_overlap=xy_overlap))
-
-    return windows
-
-
 def part(image, bbox):
     """Returns a part of an image (defined by a bounding box)"""
     start, end = bbox
@@ -117,8 +98,8 @@ def get_feature_vectors(image,
         # window size, y_start, y_end
         # [240, y_min, None],
         [192, y_min, None],
-        [128, y_min, None],
-        # [96, y_min, None],
+        # [128, y_min, None],
+        [80, y_min, None],
         # [64, y_min, None]
     ]
 
