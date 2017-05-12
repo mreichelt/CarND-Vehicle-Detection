@@ -104,7 +104,7 @@ def get_feature_vectors(image,
                         hog_pixels_per_cell=8,
                         hog_cells_per_block=2,
                         hog_channels=[0, 1, 2],
-                        xy_overlap=(0.5, 0.5),  # how much to overlap sliding windows
+                        xy_overlap=(0.75, 0.75),  # how much to overlap sliding windows
                         train_size=64  # image size used to create the original feature vectors (64x64)
                         ):
     vectors = []
@@ -115,6 +115,7 @@ def get_feature_vectors(image,
 
     window_definitions = [
         # window size, y_start, y_end
+        # [240, y_min, None],
         [192, y_min, None],
         [128, y_min, None],
         # [96, y_min, None],
@@ -209,8 +210,8 @@ def draw_labeled_bboxes(image, labels):
 
 class HeatMapHistory:
     def __init__(self,
-                 n=10,  # maximum number of heatmaps to store
-                 threshold=6  # threshold of how many heat is needed for a vehicle to be detected (summed up on frames)
+                 n=5,  # maximum number of heatmaps to store
+                 threshold=10  # threshold of how many heat is needed for a vehicle to be detected (summed up on frames)
                  ):
         self.n = n
         self.threshold = threshold
@@ -235,8 +236,6 @@ def get_heatmap(image, bboxes):
 
 
 def pipeline(image, history: HeatMapHistory, clf: LinearSVC, scaler: StandardScaler):
-    t = time.time()
-
     # get those feature vectors, includes sliding window for performance reasons
     feature_vectors, bboxes = get_feature_vectors(image)
 
@@ -253,13 +252,10 @@ def pipeline(image, history: HeatMapHistory, clf: LinearSVC, scaler: StandardSca
 
     # get thresholded heatmap from history (includes heatmaps from last frames)
     thresholded_heatmap = history.get_thresholded_heatmap()
-    labels = label(heatmap)
+    labels = label(thresholded_heatmap)
 
     # draw output image
-    output = draw_labeled_bboxes(image, labels)
-    print('frame took {:.0f} ms'.format((time.time() - t) * 1000))
-
-    return output
+    return draw_labeled_bboxes(image, labels)
 
 
 def main_test_image():
@@ -306,4 +302,4 @@ def main(video_file, duration=None, end=False):
 
 
 # main_test_image()
-main('project_video.mp4', duration=10, end=True)
+main('project_video.mp4')
