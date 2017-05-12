@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from skimage.feature import hog
 from sklearn.svm import LinearSVC
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import train_classifier
 
@@ -57,12 +56,13 @@ def slide_window(img,
 
 
 def sliding_windows_for_vehicles(img, xy_overlap=(0.5, 0.5), y_min=320):
+    # TODO
     window_definitions = [
         # window size, y_start, y_end
-        [200, y_min, None],
+        # [200, y_min, None],
         [128, y_min, None],
-        [96, y_min, None],
-        [64, y_min, None]
+        # [96, y_min, None],
+        # [64, y_min, None]
     ]
 
     windows = []
@@ -80,9 +80,41 @@ def part(image, bbox):
     return image[start[1]:end[1], start[0]:end[0]]
 
 
-def feature_vector(image, window, size=(64, 64)):
+def scale_window(window, scale):
+    return scale_tuple(window[0], scale), scale_tuple(window[1], scale)
+
+
+def scale_tuple(point, scale):
+    point = scale * point
+    return int(point[0]), int(point[1])
+
+
+def feature_vector(image, window,
+                   size=64,
+                   conversion=cv2.COLOR_RGB2YUV,
+                   hog_orientations=9,
+                   hog_pixels_per_cell=8,
+                   hog_cells_per_block=2,
+                   hog_channel=0
+                   ):
+    image = cv2.cvtColor(image, conversion)
+    height, width = image.shape[:2]
+    scale = 64 / 128
+    image = cv2.resize(image, (int(scale * width), int(scale * height)))
+    window = scale_window(window, scale)
     image = part(image, window)
-    image = cv2.resize(image, size)
+
+
+    # vec, vis = train_classifier.get_hog_features(image[:, :, hog_channel],
+    #                                              orientations=hog_orientations,
+    #                                              pix_per_cell=hog_pixels_per_cell,
+    #                                              cell_per_block=hog_cells_per_block,
+    #                                              visualize=True,
+    #                                              feature_vector=False)
+    # plt.imshow(vis)
+    # plt.show()
+    # exit()
+
     return train_classifier.extract_features(
         [image],
         color_space='YUV',
@@ -103,7 +135,7 @@ def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
     """Draw bounding boxes"""
     result = np.copy(img)
     for bbox in bboxes:
-        cv2.rectangle(result, (bbox[0][0], bbox[0][1]),  (bbox[1][0], bbox[1][1]), color, thick)
+        cv2.rectangle(result, (bbox[0][0], bbox[0][1]), (bbox[1][0], bbox[1][1]), color, thick)
     return result
 
 
@@ -125,7 +157,6 @@ def main():
     bboxes = bboxes[predictions == 1]
     output = draw_boxes(image, bboxes)
     plt.imshow(output)
-    plt.savefig('output_images/005_first_prediction.jpg')
     plt.show()
 
 
