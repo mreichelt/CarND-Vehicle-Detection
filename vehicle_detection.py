@@ -209,20 +209,23 @@ class HeatMapHistory:
         # only store n heatmaps at maximum
         self.heatmaps = self.heatmaps[-self.n:]
 
+    def get_heatmap(self):
+        return np.sum(self.heatmaps, axis=0)
+
     def get_thresholded_heatmap(self):
-        heatmap = np.sum(self.heatmaps, axis=0)
+        heatmap = self.get_heatmap()
         heatmap[heatmap < self.threshold] = 0
         return heatmap
 
 
 def get_heatmap(image, bboxes):
-    heatmap = np.zeros_like(image)
+    heatmap = np.zeros_like(image[:, :, 0]).astype(np.float)
     for box in bboxes:
         heatmap[box[0][1]:box[1][1], box[0][0]:box[1][0]] += 1
     return heatmap
 
 
-def pipeline(image, history: HeatMapHistory, clf: LinearSVC, scaler: StandardScaler):
+def pipeline(image, history: HeatMapHistory, clf: LinearSVC, scaler: StandardScaler, show_heatmap=False):
     # get those feature vectors, includes sliding window for performance reasons
     feature_vectors, bboxes = get_feature_vectors(image)
 
@@ -237,12 +240,17 @@ def pipeline(image, history: HeatMapHistory, clf: LinearSVC, scaler: StandardSca
     heatmap = get_heatmap(image, bboxes)
     history.append(heatmap)
 
-    # get thresholded heatmap from history (includes heatmaps from last frames)
-    thresholded_heatmap = history.get_thresholded_heatmap()
-    labels = label(thresholded_heatmap)
+    if show_heatmap:
+        # debug code for showing a video of the heatmap
+        heatmap = history.get_heatmap() * 10
+        return np.dstack((heatmap, heatmap, heatmap))
 
-    # draw output image
-    return draw_labeled_bboxes(image, labels)
+    else:
+        # get thresholded heatmap from history (includes heatmaps from last frames)
+        thresholded_heatmap = history.get_thresholded_heatmap()
+        labels = label(thresholded_heatmap)
+        # draw output image
+        return draw_labeled_bboxes(image, labels)
 
 
 def main_test_image():
