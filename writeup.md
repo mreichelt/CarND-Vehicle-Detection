@@ -299,11 +299,16 @@ a heatmap for each frame. I then appended each heatmap to an instance of my `Hea
 the heatmaps over the last `n` frames. Then I could apply a threshold to get a final heatmap over the last `n` frames.
  
 Finally I used `scipy.ndimage.measurements.label()` to identify individual blobs in the heatmap.  I then assumed each
-blob corresponded to a vehicle.  I constructed bounding boxes to cover the area of each blob detected.  
+blob corresponded to a vehicle. I constructed bounding boxes to cover the area of each blob detected.  
 
-Here's an example result showing the heatmap from a series of frames of video, the result of `scipy.ndimage.measurements.label()` and the bounding boxes then overlaid on the last frame of video:
+I created a heatmap representation video of what the project video looks like, where I did not choose a threshold to drop
+yet.
+[You can find the video here](output_heatmap.mp4). For example, this is a frame of that video:
 
-**TODO**
+![screenshot from heatmap video](output_images/005_heatmap_video.png)
+
+On the right are the two cars, while on the left there is a false positive which is filtered out by choosing an
+appropriate threshold.
 
 ---
 
