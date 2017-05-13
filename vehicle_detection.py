@@ -1,3 +1,4 @@
+import matplotlib
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import LinearSVC
 
@@ -5,6 +6,7 @@ from scipy.ndimage.measurements import label
 
 import train_classifier
 import time
+import glob
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
@@ -95,21 +97,25 @@ def get_feature_vectors(image,
     image = cv2.cvtColor(image, conversion)
 
     window_definitions = [
-        # window size, y_start, y_end
-        # [240, y_min, None],
-        [192, y_min, None],
-        # [128, y_min, None],
-        [80, y_min, None],
-        # [64, y_min, None]
+        # window size, x_start, x_end, y_start, y_end
+        # [240, None, None, y_min, None],
+        [192, 192, None, y_min + 192, None],
+        # [128, None, None, y_min, None],
+        [80, 160, None, y_min, 560],
+        # [64, None, None, y_min, None]
     ]
 
     # run multiple windows of each definition once - allows us to reuse images for multiple windows
     for window_definition in window_definitions:
-        window_size, y_start, y_stop = window_definition
+        window_size, x_start, x_stop, y_start, y_stop = window_definition
+        x_start_stop = (x_start, x_stop)
         y_start_stop = (y_start, y_stop)
 
         # define all windows in one size
-        windows = slide_window(image, xy_window=(window_size, window_size), y_start_stop=y_start_stop,
+        windows = slide_window(image,
+                               xy_window=(window_size, window_size),
+                               x_start_stop=x_start_stop,
+                               y_start_stop=y_start_stop,
                                xy_overlap=xy_overlap)
         all_windows.extend(windows)
 
@@ -282,5 +288,16 @@ def main(video_file, duration=None, end=False):
     processed.write_videofile('output.mp4', audio=False)
 
 
+def main_test_images():
+    clf, scaler = train_classifier.load_classifier()
+    images = glob.glob('test_images/*.jpg')
+    for i, file in enumerate(images):
+        print(file)
+        image = train_classifier.read_rgb_image(file)
+        result = pipeline(image, HeatMapHistory(n=1, threshold=1), clf, scaler)
+        matplotlib.image.imsave('output_images/test{}.jpg'.format(i + 1), result)
+
+
 # main_test_image()
+# main_test_images()
 main('project_video.mp4')

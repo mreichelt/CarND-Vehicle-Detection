@@ -182,44 +182,128 @@ To move forward, I stored the classifier and the standard scaler in a file `clas
 
 #### 1. Describe how (and identify where in your code) you implemented a sliding window search.  How did you decide what scales to search and how much to overlap windows?
 
-I decided to search random window positions at random scales all over the image and came up with this (ok just kidding I didn't actually ;):
+The code can be found in the `get_feature_vectors` function in [vehicle_detection.py](vehicle_detection.py).
 
-![alt text][image3]
+At first I defined the sliding windows in a separate function, which I later passed on to another function to build the
+feature vectors. Then I noticed this might not be the fastest approach. By defining all sliding windows in the same
+method as my feature vector creation I could pre-calculate HOG feature vectors and do multiple other steps
+(color conversion, scaling) only once for all windows of the same size. Example:
+
+```python
+y_min = 320
+
+window_definitions = [
+    # window size, x_start, x_end, y_start, y_end
+    # [240, None, None, y_min, None],
+    [192, 192, None, y_min + 192, None],
+    # [128, None, None, y_min, None],
+    [80, 160, None, y_min, 560],
+    # [64, None, None, y_min, None]
+]
+
+# run multiple windows of each definition once - allows us to reuse images for multiple windows
+for window_definition in window_definitions:
+    window_size, x_start, x_stop, y_start, y_stop = window_definition
+    x_start_stop = (x_start, x_stop)
+    y_start_stop = (y_start, y_stop)
+
+    # define all windows in one size
+    windows = slide_window(image,
+                           xy_window=(window_size, window_size),
+                           x_start_stop=x_start_stop,
+                           y_start_stop=y_start_stop,
+                           xy_overlap=xy_overlap)
+    all_windows.extend(windows)
+```
+
+I decided to ignore the upper 320 pixels of the video because no cars would be detected there. Also I ignored the left
+part of the image because the car in the project video was always driving on the left lane.
 
 #### 2. Show some examples of test images to demonstrate how your pipeline is working.  What did you do to optimize the performance of your classifier?
 
-Ultimately I searched on two scales using YCrCb 3-channel HOG features plus spatially binned color and histograms of color in the feature vector, which provided a nice result.  Here are some example images:
+At first I tried to run the same feature vector extraction function as in my [train_classifier.py](train_classifier.py) file.
+I was able to get to a visual output pretty quickly:
 
-![alt text][image4]
+![first prediction](output_images/004_first_prediction.jpg)
+
+As you can see, even if my classifier has an accuracy of 99.5% it still detected some false positives.
+Also, this approach had the downside that every heavy computation step would be performed on each window - meaning around
+500 windows at that time.
+
+To perform better, I had to re-write some code. For example, I did the color conversion only once.
+Then, for every window size I used I scaled down the image accordingly (to match the 64x64 training size). I made sure
+to only pick window sizes dividable by 8 in order to easily extract HOG features later.
+
+Ultimately I searched on three scales using YUV 3-channel HOG features plus spatially binned color and histograms of color in the feature vector, which provided a nice result.  Here are some example images:
+
+![test 1](output_images/test1.jpg)
+
+![test 2](output_images/test2.jpg)
+
+![test 3](output_images/test3.jpg)
+
+![test 4](output_images/test4.jpg)
+
+![test 5](output_images/test5.jpg)
+
+![test 6](output_images/test6.jpg)
+
+As you can see, the detection works quite well. It even detects some of the cars coming from the other direction.
+
+To improve the performance of my classifier, I only called the HOG function once for each combination of channel &
+window size. It was much more costly before when I called the HOG function for every single window.
+
+Still, I could have improved the performance further. For example:
+
+- Currently I call the HOG method for the complete image. But as you can see I do not use the upper part of 320
+pixels. This could obviously be improved.
+- Also, in my classifier I used all 3 color channels of YUV for creating the HOG features. While this improves the
+accuracy of the classifier, it also leads to a negative impact in performance. One HOG channel could be enough.
 
 ---
 
 ### Video Implementation
 
-#### 1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (somewhat wobbly or unstable bounding boxes are ok as long as you are identifying the vehicles most of the time with minimal false positives.)
+#### 1. Provide a link to your final video output. Your pipeline should perform reasonably well on the entire project video (somewhat wobbly or unstable bounding boxes are ok as long as you are identifying the vehicles most of the time with minimal false positives.)
 
-Here's a [link to my video result](./project_video.mp4)
+Here's a [link to my video result](./output.mp4).
 
 
 #### 2. Describe how (and identify where in your code) you implemented some kind of filter for false positives and some method for combining overlapping bounding boxes.
 
-I recorded the positions of positive detections in each frame of the video.  From the positive detections I created a heatmap and then thresholded that map to identify vehicle positions.  I then used `scipy.ndimage.measurements.label()` to identify individual blobs in the heatmap.  I then assumed each blob corresponded to a vehicle.  I constructed bounding boxes to cover the area of each blob detected.  
+The code can be found in file [vehicle_detection.py](vehicle_detection.py), mostly the class `HeatMapHistory`:
+
+```python
+class HeatMapHistory:
+    def __init__(self,
+                 n=5,  # maximum number of heatmaps to store
+                 threshold=10  # threshold of how many heat is needed for a vehicle to be detected (summed up on frames)
+                 ):
+        self.n = n
+        self.threshold = threshold
+        self.heatmaps = []
+
+    def append(self, heatmap):
+        self.heatmaps.append(heatmap)
+        # only store n heatmaps at maximum
+        self.heatmaps = self.heatmaps[-self.n:]
+
+    def get_thresholded_heatmap(self):
+        heatmap = np.sum(self.heatmaps, axis=0)
+        heatmap[heatmap < self.threshold] = 0
+        return heatmap
+```
+
+I recorded the positions of positive detections in each frame of the video. From the positive detections I created
+a heatmap for each frame. I then appended each heatmap to an instance of my `HeatMapHistory` class. There, I summed up
+the heatmaps over the last `n` frames. Then I could apply a threshold to get a final heatmap over the last `n` frames.
+ 
+Finally I used `scipy.ndimage.measurements.label()` to identify individual blobs in the heatmap.  I then assumed each
+blob corresponded to a vehicle.  I constructed bounding boxes to cover the area of each blob detected.  
 
 Here's an example result showing the heatmap from a series of frames of video, the result of `scipy.ndimage.measurements.label()` and the bounding boxes then overlaid on the last frame of video:
 
-### Here are six frames and their corresponding heatmaps:
-
-![alt text][image5]
-
-### Here is the output of `scipy.ndimage.measurements.label()` on the integrated heatmap from all six frames:
-
-![alt text][image6]
-
-### Here the resulting bounding boxes are drawn onto the last frame in the series:
-
-![alt text][image7]
-
-
+**TODO**
 
 ---
 
@@ -227,5 +311,22 @@ Here's an example result showing the heatmap from a series of frames of video, t
 
 #### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
+I found that choosing which parameters to include in training a classifier was non-trivial. It is not always clear which
+of the features will have the best impact, and it involves a lot of trial-and-error. Besides of that, HOG features
+seem to have a good impact on the accuracy of the classifier, but come at a very high cost.
 
+Also, I should have built the pipeline to be fast from the beginning. For example, I did not focus on performance when
+building the classifier, but instead I focused on the highest accuracy. Therefore I included as many features as I
+could. Also, after I built my first sliding window approach I had to start from scratch because I wanted to reuse the
+HOG features for each window size. My final approach was to define the sliding windows in the same function as the
+feature extraction. That worked much better.
+
+Currently, my pipeline suffers from some problems:
+
+- Performance: As stated before, this could be improved by using less color channels and smaller image parts for HOG
+feature extraction.
+- Some false positives. Some signs seem to get identified as vehicles. Here I could use the falsely identified images
+to retrain my classifier.
+- Some vehicles from the opposite direction get detected. This is not an issue per se: these vehicles in the
+project video are not a danger because they are separated from the lane our vehicle travels on. On other streets these
+detections are desired.
