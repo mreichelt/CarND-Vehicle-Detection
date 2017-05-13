@@ -335,3 +335,6 @@ to retrain my classifier.
 - Some vehicles from the opposite direction get detected. This is not an issue per se: these vehicles in the
 project video are not a danger because they are separated from the lane our vehicle travels on. On other streets these
 detections are desired.
+
+Overall, I believe that a CNN (convolutional neural network) based approach would have worked better than the approach
+chosen here with histogram of colors and sliding windows.
